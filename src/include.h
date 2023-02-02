@@ -26,8 +26,8 @@ struct gpt2_hparams {
     int32_t n_layer = 48;
     int32_t f16     = 1;
 };
-#elif GPT_2_775M
-#define MODEL_FILE "models/gpt-2-775M/ggml-model.bin"
+#elif GPT_2_774M
+#define MODEL_FILE "models/gpt-2-774M/ggml-model.bin"
 struct gpt2_hparams {
     int32_t n_vocab = 50257;
     int32_t n_ctx   = 1024;
@@ -36,7 +36,17 @@ struct gpt2_hparams {
     int32_t n_layer = 36;
     int32_t f16     = 1;
 };
-#elif GPT_2_117M
+#elif GPT_2_345M
+#define MODEL_FILE "models/gpt-2-345M/ggml-model.bin"
+struct gpt2_hparams {
+    int32_t n_vocab = 50257;
+    int32_t n_ctx   = 1024;
+    int32_t n_embd  = 1024;
+    int32_t n_head  = 12;
+    int32_t n_layer = 12;
+    int32_t f16     = 1;
+};
+#else
 #define MODEL_FILE "models/gpt-2-117M/ggml-model.bin"
 struct gpt2_hparams {
     int32_t n_vocab = 50257;
