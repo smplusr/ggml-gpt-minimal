@@ -2,7 +2,8 @@ MODEL	?= $(shell /bin/sh -c 'read -p "Enter a GPT-2 model (valid models are GPT_
 DEBUG	?= $(shell /bin/sh -c 'read -p "Enable debbuging? [Y/n]" debug_enable; if [[ $$debug_enable = "Y" || $$debug_enable = "y" ]]; then echo -DDEBUG; fi')
 
 
-CXX	:= g++
+CC	:= gcc -static -lpthread -pthread
+CXX	:= g++ -static -lpthread -pthread
 CFLAGS	:= -Os -D$(MODEL) $(DEBUG)
 
 SOURCES	:= include.o utils.o ggml.o main.o
