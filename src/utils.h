@@ -9,7 +9,6 @@
 #include <thread>
 
 
-
 //
 // CLI argument parsing
 //
@@ -28,6 +27,9 @@ struct gpt_params {
 
     std::string model = "models/gpt-2-117M/ggml-model.bin"; // model path
     std::string prompt;
+
+    bool verbose = true;
+    FILE *fp_out = NULL;
 };
 
 bool gpt_params_parse(int argc, char ** argv, gpt_params & params);

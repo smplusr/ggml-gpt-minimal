@@ -3,6 +3,26 @@
 #include <fstream>
 #include <regex>
 
+
+char *read_file (char *name) {
+	FILE *fp = fopen (name, "r");
+	char *str = (char *) malloc (4096 * sizeof (char)),
+	     *c = str;
+
+	if (!fp) {
+		perror (NULL);
+		return (char *) NULL;
+	}
+
+	for (; (*c = fgetc (fp)) != EOF; c++)
+		if (c > (str + (4096 * sizeof (char))))
+			break;
+
+	*--c = '\0';
+	return str;
+}
+
+
 bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -13,6 +33,10 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
             params.n_threads = std::stoi(argv[++i]);
         } else if (arg == "-p" || arg == "--prompt") {
             params.prompt = argv[++i];
+        } else if (arg == "-f" || arg == "--file") {
+            params.prompt = read_file (argv[++i]);
+        } else if (arg == "-o" || arg == "--output") {
+            params.fp_out = fopen (argv[++i], "w");
         } else if (arg == "-n" || arg == "--n_predict") {
             params.n_predict = std::stoi(argv[++i]);
         } else if (arg == "--top_k") {
@@ -28,6 +52,8 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
         } else if (arg == "-h" || arg == "--help") {
             gpt_print_usage(argc, argv, params);
             exit(0);
+        } else if (arg == "-q" || arg == "--quiet") {
+            params.verbose = false;
         } else {
             fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());
             gpt_print_usage(argc, argv, params);
@@ -43,10 +69,15 @@ void gpt_print_usage(int argc, char ** argv, const gpt_params & params) {
     fprintf(stderr, "\n");
     fprintf(stderr, "options:\n");
     fprintf(stderr, "  -h, --help            show this help message and exit\n");
+    fprintf(stderr, "  -q, --quiet           don't output processing text\n");
     fprintf(stderr, "  -s SEED, --seed SEED  RNG seed (default: -1)\n");
     fprintf(stderr, "  -t N, --threads N     number of threads to use during computation (default: %d)\n", params.n_threads);
     fprintf(stderr, "  -p PROMPT, --prompt PROMPT\n");
     fprintf(stderr, "                        prompt to start generation with (default: random)\n");
+    fprintf(stderr, "  -f FNAME, --file FNAME\n");
+    fprintf(stderr, "                        use content of file as prompt\n");
+    fprintf(stderr, "  -o FNAME, --output FNAME\n");
+    fprintf(stderr, "                        dump output to file\n");
     fprintf(stderr, "  -n N, --n_predict N   number of tokens to predict (default: %d)\n", params.n_predict);
     fprintf(stderr, "  --top_k N             top-k sampling (default: %d)\n", params.top_k);
     fprintf(stderr, "  --top_p N             top-p sampling (default: %.1f)\n", params.top_p);

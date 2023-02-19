@@ -33,14 +33,16 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         fin.read((char *) &hparams.n_layer, sizeof(hparams.n_layer));
         fin.read((char *) &hparams.f16,     sizeof(hparams.f16));
 
+
 #ifdef DEBUG
-        printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
-        printf("%s: n_ctx   = %d\n", __func__, hparams.n_ctx);
-        printf("%s: n_embd  = %d\n", __func__, hparams.n_embd);
-        printf("%s: n_head  = %d\n", __func__, hparams.n_head);
-        printf("%s: n_layer = %d\n", __func__, hparams.n_layer);
-        printf("%s: f16     = %d\n", __func__, hparams.f16);
+       	printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
+       	printf("%s: n_ctx   = %d\n", __func__, hparams.n_ctx);
+       	printf("%s: n_embd  = %d\n", __func__, hparams.n_embd);
+       	printf("%s: n_head  = %d\n", __func__, hparams.n_head);
+       	printf("%s: n_layer = %d\n", __func__, hparams.n_layer);
+       	printf("%s: f16     = %d\n", __func__, hparams.f16);
 #endif
+
     }
 
     // load vocab
@@ -112,7 +114,9 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         ctx_size += (6 + 12*n_layer)*256; // object overhead
 
-        //printf("%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
+#ifdef DEBUG
+        printf("%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
+#endif
     }
 
     // create the ggml context
@@ -210,8 +214,9 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         model.memory_v = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
 
         const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
-
-        //printf("%s: memory size = %8.2f MB, n_mem = %d\n", __func__, memory_size/1024.0/1024.0, n_mem);
+#ifdef DEBUG
+        printf("%s: memory size = %8.2f MB, n_mem = %d\n", __func__, memory_size/1024.0/1024.0, n_mem);
+#endif
     }
 
     // load weights
@@ -271,8 +276,9 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             ////printf("%24s - [%5d, %5d], type = %6s, %6.2f MB\n", name.data(), ne[0], ne[1], ftype == 0 ? "float" : "f16", ggml_nbytes(tensor)/1024.0/1024.0);
             total_size += ggml_nbytes(tensor);
         }
-
-        //printf("%s: model size  = %8.2f MB\n", __func__, total_size/1024.0/1024.0);
+#ifdef DEBUG
+        printf("%s: model size  = %8.2f MB\n", __func__, total_size/1024.0/1024.0);
+#endif
     }
 
     fin.close();
@@ -310,7 +316,10 @@ bool gpt2_eval(
 
     if (mem_per_token > 0 && mem_per_token*N > buf_size) {
         const size_t buf_size_new = 1.1*(mem_per_token*N); // add 10% to account for ggml object overhead
-        ////printf("\n%s: reallocating buffer from %zu to %zu bytes\n", __func__, buf_size, buf_size_new);
+
+#ifdef DEBUG
+	printf("\n%s: reallocating buffer from %zu to %zu bytes\n", __func__, buf_size, buf_size_new);
+#endif
 
         // reallocate
         buf_size = buf_size_new;
@@ -587,7 +596,6 @@ bool gpt2_eval(
     if (mem_per_token == 0) {
         mem_per_token = ggml_used_mem(ctx0)/N;
     }
-    ////printf("used_mem = %zu\n", ggml_used_mem(ctx0));
 
     ggml_free(ctx0);
 
@@ -597,9 +605,11 @@ bool gpt2_eval(
 
 
 
-bool generate (char *output, gpt_vocab vocab, gpt2_model model, gpt_params params) {
+char *generate (gpt_vocab vocab, gpt2_model model, gpt_params params) {
     const int64_t t_main_start_us = ggml_time_us();
-    char *outptr = output;
+    const uint8_t avg_word_length = 5;
+    char *output = (char *) malloc (params.n_predict * avg_word_length * sizeof (char));
+
 
     if (params.seed < 0)
         params.seed = time(NULL);
@@ -617,7 +627,7 @@ bool generate (char *output, gpt_vocab vocab, gpt2_model model, gpt_params param
 
         if (!gpt2_model_load(params.model, model, vocab)) {
             fprintf(stderr, "%s: failed to load model from '%s'\n", __func__, params.model.c_str());
-            return 1;
+            exit (1);
         }
 
         t_load_us = ggml_time_us() - t_start_us;
@@ -647,8 +657,8 @@ bool generate (char *output, gpt_vocab vocab, gpt2_model model, gpt_params param
             const int64_t t_start_us = ggml_time_us();
 
             if (!gpt2_eval(model, params.n_threads, n_past, embd, embd_w, mem_per_token)) {
-                //printf("Failed to predict\n");
-                return 1;
+                fprintf(stderr, "Failed to predict\n");
+                exit (1);
             }
 
             t_predict_us += ggml_time_us() - t_start_us;
@@ -675,25 +685,26 @@ bool generate (char *output, gpt_vocab vocab, gpt2_model model, gpt_params param
                 t_sample_us += ggml_time_us() - t_start_sample_us;
             }
 
-            // add it to the context
+            // add it to the context and output string
             embd.push_back(id);	
-
-	    char *generated = (char *) vocab.id_to_token[id].c_str();
-	    for (; *generated; generated++, outptr++)
-		    *outptr = *generated;
+	    strcat (output, vocab.id_to_token[id].c_str ());
 
         } else {
             // if here, it means we are still processing the input prompt
             for (int k = i; k < embd_inp.size(); k++) {
                 embd.push_back(embd_inp[k]);
-
                 if (embd.size() >= params.n_batch) {
-                    break;
+		    break;
                 }
             }
             i += embd.size() - 1;
         } 
 
+	if (params.verbose) {
+		for (auto id : embd)
+			printf ("%s", vocab.id_to_token[id].c_str ());
+		fflush (stdout);
+	}
 
 
         // end of text token
@@ -707,14 +718,21 @@ bool generate (char *output, gpt_vocab vocab, gpt2_model model, gpt_params param
     {
         const int64_t t_main_end_us = ggml_time_us();
 
-        printf("\n\n");
+        printf("\n");
         printf("%s: mem per token = %8zu bytes\n", __func__, mem_per_token);
         printf("%s:     load time = %8.2f ms\n", __func__, t_load_us/1000.0f);
         printf("%s:   sample time = %8.2f ms\n", __func__, t_sample_us/1000.0f);
         printf("%s:  predict time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us/1000.0f, t_predict_us/1000.0f/n_past);
-        printf("%s:    total time = %8.2f ms\n\n\n", __func__, (t_main_end_us - t_main_start_us)/1000.0f);
+        printf("%s:    total time = %8.2f ms\n", __func__, (t_main_end_us - t_main_start_us)/1000.0f);
     }
 #endif
 
-    return 0;
+    if (params.fp_out) {
+	   for (char *c = output; *c; c++)
+		   fputc (*c, params.fp_out);
+
+	   fflush (params.fp_out);
+    }
+
+    return output;
 }
